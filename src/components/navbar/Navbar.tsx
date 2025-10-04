@@ -76,7 +76,7 @@ export default function Navbar({ user }: NavbarProps) {
               className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
             >
               <Shield className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">PetGuard NFC</span>
+              <span className="text-xl font-bold text-gray-900">LinkPet</span>
             </button>
           </div>
 

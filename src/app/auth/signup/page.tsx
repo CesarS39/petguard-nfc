@@ -64,7 +64,7 @@ export default function SignupForm() {
         {/* Header */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900">Crear Cuenta</h2>
-          <p className="mt-2 text-gray-600">Únete a PetGuard NFC</p>
+          <p className="mt-2 text-gray-600">Únete a LinkPet</p>
         </div>
 
         {/* Form */}

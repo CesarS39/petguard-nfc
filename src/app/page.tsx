@@ -43,7 +43,7 @@ export default function LandingPage() {
             <div className="flex justify-between items-center py-4">
               <div className="flex items-center space-x-2">
                 <Shield className="h-8 w-8 text-blue-600" />
-                <span className="text-2xl font-bold text-gray-900">PetGuard NFC</span>
+                <span className="text-2xl font-bold text-gray-900">LinkPet</span>
               </div>
               <div className="flex space-x-4">
                 <button 
@@ -128,7 +128,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">¿Cómo funciona PetGuard NFC?</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">¿Cómo funciona LinkPet?</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Tres simples pasos para proteger a tu mascota con la tecnología más avanzada
             </p>
@@ -282,7 +282,7 @@ export default function LandingPage() {
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Shield className="h-6 w-6 text-blue-400" />
-                <span className="text-xl font-bold">PetGuard NFC</span>
+                <span className="text-xl font-bold">LinkPet</span>
               </div>
               <p className="text-gray-400">
                 Tecnología NFC para proteger a las mascotas más queridas de México.
@@ -317,7 +317,7 @@ export default function LandingPage() {
           </div>
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 PetGuard NFC. Todos los derechos reservados.</p>
+            <p>&copy; 2025 LinkPet. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>

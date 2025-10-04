@@ -10,7 +10,7 @@ export default function LoginPage() {
             Iniciar Sesión
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Accede a tu cuenta de PetGuard NFC
+            Accede a tu cuenta de LinkPet
           </p>
         </div>
         

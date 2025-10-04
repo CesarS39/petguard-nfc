@@ -248,7 +248,7 @@ export default function PublicPetPage() {
                 href="/"
                 className="text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                PetGuard NFC
+                LinkPet
               </Link>
             </div>
           </div>
