@@ -11,6 +11,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.0",
     "@types/google.maps": "^3.58.1",
     "@types/uuid": "^10.0.0",

@@ -17,7 +17,6 @@ export default function PublicPetPage() {
       try {
         console.log('Buscando mascota con ID:', params.id)
         
-        // Primero intentar obtener solo la mascota
         const { data: petData, error: petError } = await supabase
           .from('pets')
           .select('*')
@@ -33,7 +32,6 @@ export default function PublicPetPage() {
           return
         }
 
-        // Luego obtener el perfil del dueño
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('full_name, phone, email')
@@ -44,10 +42,8 @@ export default function PublicPetPage() {
 
         if (profileError) {
           console.warn('No se encontró perfil:', profileError)
-          // Continuar sin perfil si no existe
         }
 
-        // Combinar los datos
         const combinedData = {
           ...petData,
           profiles: profileData || { 
@@ -75,10 +71,13 @@ export default function PublicPetPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-emerald-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando información...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+            <div className="absolute inset-0 animate-pulse rounded-full h-20 w-20 border-4 border-emerald-400/30 mx-auto"></div>
+          </div>
+          <p className="mt-6 text-slate-700 text-lg font-semibold">Cargando información...</p>
         </div>
       </div>
     )
@@ -86,22 +85,20 @@ export default function PublicPetPage() {
 
   if (error || !pet) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto">
-          <div className="mb-4">
-            <span className="text-6xl">🐕</span>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-emerald-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md mx-auto bg-white rounded-2xl p-8 shadow-xl border border-slate-200">
+          <div className="mb-6 text-8xl">🐕</div>
+          <h2 className="text-3xl font-bold text-slate-800 mb-4">
             Mascota no encontrada
           </h2>
-          <p className="text-gray-600 mb-4">
-            El código {params.id} no corresponde a ninguna mascota activa o el enlace puede estar dañado.
+          <p className="text-slate-600 mb-6 text-lg">
+            El código <span className="font-mono font-bold text-blue-600">{params.id}</span> no corresponde a ninguna mascota activa.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all transform hover:scale-105 shadow-lg"
           >
-            Ir al inicio
+            ← Ir al inicio
           </Link>
         </div>
       </div>
@@ -111,142 +108,182 @@ export default function PublicPetPage() {
   const owner = pet.profiles
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-emerald-50">
+      {/* Decorative background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 -left-40 w-96 h-96 bg-emerald-400/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl"></div>
+      </div>
+
       {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="relative bg-white/80 backdrop-blur-sm border-b border-slate-200/50 shadow-sm">
+        <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
-              <span className="text-2xl">🐕</span>
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-3xl mb-5 shadow-lg">
+              <span className="text-5xl">🐕</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-3">
               ¡Hola! Soy {pet.name}
             </h1>
-            <p className="text-gray-600 mt-2">
-              Si me encontraste, por favor ayúdame a volver a casa
+            <p className="text-slate-600 text-lg md:text-xl max-w-2xl mx-auto">
+              Si me encontraste, por favor ayúdame a volver a casa 🏠
             </p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="relative max-w-5xl mx-auto px-4 py-12 space-y-8">
         {/* Pet Photo */}
         {pet.photo_url && (
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <img
-              src={pet.photo_url}
-              alt={pet.name}
-              className="w-48 h-48 object-cover rounded-full mx-auto"
-            />
+          <div className="flex justify-center">
+            <div className="relative group">
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full blur-xl opacity-30 group-hover:opacity-50 transition-opacity"></div>
+              <img
+                src={pet.photo_url}
+                alt={pet.name}
+                className="relative w-72 h-72 object-cover rounded-full ring-4 ring-white shadow-2xl"
+              />
+              <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full flex items-center justify-center text-4xl shadow-xl">
+                ❤️
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Pet Info */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Información de {pet.name}
+        {/* Pet Info Card */}
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+          <div className="px-8 py-6 bg-gradient-to-r from-blue-600 to-cyan-600">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+              <span className="text-3xl">📋</span> 
+              <span>Información de {pet.name}</span>
             </h2>
           </div>
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <span className="text-sm font-medium text-gray-500">Nombre:</span>
-                <p className="text-gray-900">{pet.name}</p>
+          <div className="p-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-5 border border-blue-100">
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Nombre</span>
+                <p className="text-slate-800 text-2xl font-bold mt-1">{pet.name}</p>
               </div>
               
               {pet.breed && (
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Raza:</span>
-                  <p className="text-gray-900">{pet.breed}</p>
+                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-5 border border-emerald-100">
+                  <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Raza</span>
+                  <p className="text-slate-800 text-2xl font-bold mt-1">{pet.breed}</p>
                 </div>
               )}
               
               {pet.age && (
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Edad:</span>
-                  <p className="text-gray-900">{pet.age}</p>
-                </div>
-              )}
-              
-              {pet.medical_conditions && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                  <span className="text-sm font-medium text-yellow-800">
-                    ⚠️ Información médica importante:
-                  </span>
-                  <p className="text-yellow-700 mt-1">{pet.medical_conditions}</p>
-                </div>
-              )}
-              
-              {pet.reward && (
-                <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                  <span className="text-sm font-medium text-green-800">
-                    💰 Recompensa:
-                  </span>
-                  <p className="text-green-700 mt-1">{pet.reward}</p>
+                <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl p-5 border border-cyan-100">
+                  <span className="text-xs font-bold text-cyan-600 uppercase tracking-wider">Edad</span>
+                  <p className="text-slate-800 text-2xl font-bold mt-1">{pet.age}</p>
                 </div>
               )}
             </div>
+            
+            {pet.medical_conditions && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-2xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">⚠️</span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-bold text-amber-800 uppercase tracking-wider block mb-2">
+                      Información médica importante
+                    </span>
+                    <p className="text-slate-700 font-medium text-lg leading-relaxed">{pet.medical_conditions}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {pet.reward && (
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border-l-4 border-emerald-500 rounded-2xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">💰</span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-bold text-emerald-800 uppercase tracking-wider block mb-2">
+                      Recompensa
+                    </span>
+                    <p className="text-slate-700 font-medium text-lg leading-relaxed">{pet.reward}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Contact Info */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Contactar a mi familia
+        {/* Contact Info Card */}
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+          <div className="px-8 py-6 bg-gradient-to-r from-emerald-600 to-green-600">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+              <span className="text-3xl">👨‍👩‍👧‍👦</span> 
+              <span>Contactar a mi familia</span>
             </h2>
           </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <span className="text-sm font-medium text-gray-500">Dueño:</span>
-              <p className="text-gray-900">{owner.full_name}</p>
+          <div className="p-8 space-y-6">
+            <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl p-5 border border-slate-200">
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dueño</span>
+              <p className="text-slate-800 text-2xl font-bold mt-1">{owner.full_name}</p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {owner.phone && (
                 <a
                   href={`tel:${owner.phone}`}
-                  className="flex-1 bg-green-600 text-white text-center py-3 px-4 rounded-md hover:bg-green-700 transition-colors"
+                  className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                 >
-                  📞 Llamar: {owner.phone}
+                  <div className="relative z-10 text-center">
+                    <span className="block text-3xl mb-2">📞</span>
+                    <span className="block text-sm font-semibold opacity-90 mb-1">Llamar ahora</span>
+                    <span className="block font-mono text-lg font-bold">{owner.phone}</span>
+                  </div>
                 </a>
               )}
               
               <a
                 href={`mailto:${owner.email}?subject=Encontré a ${pet.name}&body=Hola, encontré a ${pet.name}. Por favor contáctame para coordinar su regreso.`}
-                className="flex-1 bg-blue-600 text-white text-center py-3 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                className="group relative overflow-hidden bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
               >
-                ✉️ Enviar Email
+                <div className="relative z-10 text-center">
+                  <span className="block text-3xl mb-2">✉️</span>
+                  <span className="block text-sm font-semibold opacity-90 mb-1">Enviar Email</span>
+                  <span className="block text-xs opacity-80">Contacto rápido</span>
+                </div>
               </a>
             </div>
           </div>
         </div>
 
         {/* Report Found Form */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              🎉 ¡Reportar que encontré a {pet.name}!
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+          <div className="px-8 py-6 bg-gradient-to-r from-cyan-600 to-blue-600">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+              <span className="text-3xl">🎉</span> 
+              <span>¡Reportar que encontré a {pet.name}!</span>
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-blue-100 mt-2 text-sm">
               Llena este formulario para notificar al dueño tu ubicación y datos de contacto
             </p>
           </div>
-          <div className="p-6">
+          <div className="p-8 bg-slate-50">
             <FoundReportForm petId={pet.id} petName={pet.name} />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="text-center py-6">
-          <div className="inline-flex items-center justify-center space-x-2 text-gray-500">
-            <span className="text-2xl">🏠</span>
-            <div>
-              <p className="text-sm">Protegido por</p>
+        <div className="text-center py-8">
+          <div className="inline-flex items-center justify-center space-x-4 bg-white px-8 py-5 rounded-2xl border border-slate-200 shadow-lg">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-xl flex items-center justify-center">
+              <span className="text-2xl">🏠</span>
+            </div>
+            <div className="text-left">
+              <p className="text-slate-500 text-xs font-medium">Protegido por</p>
               <Link 
                 href="/"
-                className="text-indigo-600 hover:text-indigo-800 font-medium"
+                className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 font-black text-2xl transition-all"
               >
                 LinkPet
               </Link>
