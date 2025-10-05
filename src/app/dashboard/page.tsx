@@ -19,17 +19,15 @@ export default function DashboardPage() {
     const getUser = async () => {
       try {
         const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (error || !user) {
-          console.log("No hay usuario, redirigiendo al login");
-          window.location.href = "/auth/login";
+        if (!session) {
+          router.push("/auth/login");
           return;
         }
 
-        setUser(user);
+        setUser(session.user);
 
         const { data: profileData } = await supabase
           .from("profiles")

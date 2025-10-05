@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 import LogoutButton from '@/components/auth/LogoutButton'
 
@@ -25,6 +25,8 @@ interface Report {
 }
 
 export default function ReportsPage() {
+  const supabase = createClientComponentClient()
+  
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -34,7 +36,8 @@ export default function ReportsPage() {
     const fetchReports = async () => {
       try {
         // Obtener usuario actual
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        const { data: { session }, error: userError } = await supabase.auth.getSession()
+        const user = session?.user
         
         if (userError || !user) {
           window.location.href = '/auth/login'
@@ -72,7 +75,7 @@ export default function ReportsPage() {
     }
 
     fetchReports()
-  }, [])
+  }, [supabase])
 
   if (loading) {
     return (

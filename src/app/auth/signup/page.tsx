@@ -1,10 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SignupForm() {
+  const router = useRouter()
+  const supabase = createClientComponentClient()
+  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -34,7 +38,8 @@ export default function SignupForm() {
           data: {
             full_name: formData.fullName,
             phone: formData.phone
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       })
 
@@ -45,7 +50,8 @@ export default function SignupForm() {
         if (data.session) {
           // Si hay sesión inmediata (email confirmation deshabilitado)
           setMessage({ type: 'success', text: '¡Cuenta creada! Redirigiendo...' })
-          setTimeout(() => window.location.href = '/dashboard', 1500)
+          router.refresh()
+          router.push('/dashboard')
         } else {
           // Si necesita confirmación de email
           setMessage({ type: 'success', text: '¡Cuenta creada! Revisa tu email para activarla.' })
@@ -64,7 +70,7 @@ export default function SignupForm() {
         {/* Header */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900">Crear Cuenta</h2>
-          <p className="mt-2 text-gray-600">Únete a LinkPet</p>
+          <p className="mt-2 text-gray-600">Únete a PetGuard</p>
         </div>
 
         {/* Form */}

@@ -1,12 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Cliente para componentes del frontend con manejo automático de cookies
+export const supabase = createClientComponentClient<Database>()
 
-// Cliente para usar en componentes del frontend
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-// Tipos para TypeScript (los definiremos cuando creemos las tablas)
+// Tipos para TypeScript
 export type Database = {
   public: {
     Tables: {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -10,6 +10,8 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024
 
 export default function AddPetPage() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
+  
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -36,7 +38,8 @@ export default function AddPetPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        const { data: { session }, error: authError } = await supabase.auth.getSession()
+        const user = session?.user
         
         if (authError || !user) {
           router.replace('/auth/login')
@@ -83,7 +86,7 @@ export default function AddPetPage() {
     }
 
     checkAuth()
-  }, [router])
+  }, [router, supabase])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
