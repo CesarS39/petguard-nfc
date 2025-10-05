@@ -15,54 +15,67 @@ export default function DashboardPage() {
   const [reportsCount, setReportsCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+ useEffect(() => {
+  const getUser = async () => {
+    try {
+      // Usar getSession en lugar de getUser para consistencia con middleware
+      const { data: { session } } = await supabase.auth.getSession();
 
-        if (!session) {
-          router.push("/auth/login");
-          return;
-        }
+      if (!session || !session.user) {
+        console.log("No hay sesión, redirigiendo...");
+        router.push("/auth/login");
+        return;
+      }
 
-        setUser(session.user);
+      const user = session.user;
+      setUser(user);
 
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .single();
+      // Cargar perfil
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
 
-        setProfile(profileData);
+      setProfile(profileData);
 
-        const { data: petsData } = (await supabase
-          .from("pets")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })) as { data: any[] | null };
+      // Cargar mascotas
+      const { data: petsData } = await supabase
+        .from("pets")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-        setPets(petsData || []);
+      setPets(petsData || []);
 
+      // Contar reportes
+      if (petsData && petsData.length > 0) {
         const { count } = await supabase
           .from("found_reports")
           .select("*", { count: "exact", head: true })
-          .in(
-            "pet_id",
-            (petsData || []).map((p) => p.id)
-          );
+          .in("pet_id", petsData.map((p) => p.id));
 
         setReportsCount(count || 0);
-      } catch (error) {
-        console.error("Error:", error);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Error en dashboard:", error);
+      router.push("/auth/login");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    getUser();
-  }, []);
+  getUser();
+
+  // Escuchar cambios de autenticación
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || !session) {
+      router.push("/auth/login");
+    }
+  });
+
+  return () => subscription.unsubscribe();
+}, [supabase, router]);
 
   const handleEditPet = (petId: string) => {
     router.push(`/dashboard/pets/${petId}`);
