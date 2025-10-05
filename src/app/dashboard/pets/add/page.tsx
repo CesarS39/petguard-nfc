@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -10,13 +10,10 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024
 
 export default function AddPetPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [isAuthorized, setIsAuthorized] = useState(false)
   const [userId, setUserId] = useState<string>('')
-  const [canAddPet, setCanAddPet] = useState(false)
   const [petsCount, setPetsCount] = useState(0)
   const [maxPets, setMaxPets] = useState(3)
   
@@ -34,59 +31,68 @@ export default function AddPetPage() {
   const [imageError, setImageError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Verificación de seguridad
+  // Verificación de autenticación simplificada
   useEffect(() => {
+    let mounted = true
+
     const checkAuth = async () => {
       try {
-        const { data: { session }, error: authError } = await supabase.auth.getSession()
-        const user = session?.user
+        const { data: { session } } = await supabase.auth.getSession()
         
-        if (authError || !user) {
+        if (!mounted) return
+
+        if (!session?.user) {
+          console.log('No session found, redirecting to login')
           router.replace('/auth/login')
           return
         }
 
-        setUserId(user.id)
+        setUserId(session.user.id)
 
-        // Verificar cuántas mascotas tiene
-        const { data: petsData, count } = await supabase
-          .from('pets')
-          .select('*', { count: 'exact' })
-          .eq('user_id', user.id)
+        // Obtener perfil y mascotas en paralelo
+        const [profileResponse, petsResponse] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('max_pets')
+            .eq('user_id', session.user.id)
+            .single(),
+          supabase
+            .from('pets')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', session.user.id)
+        ])
 
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('max_pets')
-          .eq('user_id', user.id)
-          .single()
+        if (!mounted) return
 
-        const currentPets = count || 0
-        const maxAllowed = profileData?.max_pets || 3
+        const maxAllowed = profileResponse.data?.max_pets || 3
+        const currentPets = petsResponse.count || 0
 
         setPetsCount(currentPets)
         setMaxPets(maxAllowed)
 
         if (currentPets >= maxAllowed) {
-          setCanAddPet(false)
           setError(`Has alcanzado el límite de ${maxAllowed} mascotas`)
-          setLoading(false)
-          setTimeout(() => router.replace('/dashboard'), 3000)
-          return
+          setTimeout(() => {
+            if (mounted) router.replace('/dashboard')
+          }, 3000)
         }
 
-        setCanAddPet(true)
-        setIsAuthorized(true)
-      } catch (error: any) {
-        console.error('Error:', error)
-        setError('Error al verificar permisos')
-        setTimeout(() => router.replace('/dashboard'), 2000)
-      } finally {
         setLoading(false)
+      } catch (error: any) {
+        console.error('Error checking auth:', error)
+        if (mounted) {
+          setError('Error al verificar permisos')
+          setTimeout(() => router.replace('/dashboard'), 2000)
+        }
       }
     }
 
     checkAuth()
-  }, [router, supabase])
+
+    return () => {
+      mounted = false
+    }
+  }, [router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -202,8 +208,8 @@ export default function AddPetPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!isAuthorized || !canAddPet) {
-      setError('No tienes permiso para agregar mascotas')
+    if (petsCount >= maxPets) {
+      setError(`Has alcanzado el límite de ${maxPets} mascotas`)
       return
     }
 
@@ -213,12 +219,18 @@ export default function AddPetPage() {
 
     try {
       setUploadProgress(10)
+      
+      // Crear mascota
       const { data: petData, error: petError } = await supabase
         .from('pets')
         .insert([{
-          ...formData,
+          name: formData.name,
+          breed: formData.breed || null,
+          age: formData.age || null,
+          medical_conditions: formData.medical_conditions || null,
+          reward: formData.reward || null,
           user_id: userId,
-          short_id: '',
+          short_id: '', // Se genera automáticamente en el backend
           is_active: true,
           photo_url: null
         }])
@@ -227,8 +239,8 @@ export default function AddPetPage() {
 
       if (petError) throw petError
 
+      // Subir imagen si existe
       let photoUrl = null
-
       if (imageFile && petData) {
         photoUrl = await uploadImage(petData.id)
 
@@ -243,9 +255,11 @@ export default function AddPetPage() {
         }
       }
 
+      // Redirigir al dashboard
       router.push('/dashboard')
       router.refresh()
     } catch (error: any) {
+      console.error('Error creating pet:', error)
       setError(error.message || 'Error al agregar mascota')
       setUploadProgress(0)
     } finally {
@@ -263,33 +277,30 @@ export default function AddPetPage() {
               <span className="text-2xl">🐾</span>
             </div>
           </div>
-          <p className="mt-6 text-gray-700 text-lg font-semibold">Verificando permisos...</p>
+          <p className="mt-6 text-gray-700 text-lg font-semibold">Cargando...</p>
         </div>
       </div>
     )
   }
 
-  if (!isAuthorized || !canAddPet) {
+  if (petsCount >= maxPets) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md mx-auto bg-white rounded-3xl p-8 shadow-xl border border-gray-200">
-          <div className="mb-6 text-8xl">
-            {petsCount >= maxPets ? '⚠️' : '🔒'}
+          <div className="mb-6 text-8xl">⚠️</div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Límite Alcanzado</h2>
+          <p className="text-gray-600 mb-4 text-lg">{error}</p>
+          <div className="bg-blue-50 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-blue-700 font-medium">
+              Tienes {petsCount} de {maxPets} mascotas registradas
+            </p>
           </div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            {petsCount >= maxPets ? 'Límite Alcanzado' : 'Acceso Denegado'}
-          </h2>
-          <p className="text-gray-600 mb-4 text-lg">
-            {error || 'No tienes permiso para agregar mascotas'}
-          </p>
-          {petsCount >= maxPets && (
-            <div className="bg-blue-50 rounded-2xl p-4 mb-6">
-              <p className="text-sm text-blue-700 font-medium">
-                Tienes {petsCount} de {maxPets} mascotas registradas
-              </p>
-            </div>
-          )}
-          <p className="text-sm text-gray-500">Redirigiendo al dashboard...</p>
+          <Link
+            href="/dashboard"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Volver al Dashboard
+          </Link>
         </div>
       </div>
     )
@@ -299,45 +310,40 @@ export default function AddPetPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Header Card Mejorado */}
-          <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-green-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <span className="text-4xl">🐾</span>
-                  </div>
-                  <div>
-                    <h2 className="text-3xl font-bold text-gray-900">Agregar nueva mascota</h2>
-                    <p className="text-gray-600 mt-1">Completa la información de tu compañero</p>
-                  </div>
+          {/* Header Card */}
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <span className="text-4xl">🐾</span>
                 </div>
-                <Link
-                  href="/dashboard"
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-xl"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </Link>
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900">Agregar nueva mascota</h2>
+                  <p className="text-gray-600 mt-1">Completa la información de tu compañero</p>
+                </div>
               </div>
-              
-              {/* Contador de espacios */}
-              <div className="flex items-center gap-2 mt-4">
-                <div className="flex-1 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-4 border border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Espacios disponibles</span>
-                    <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-                      {maxPets - petsCount}/{maxPets}
-                    </span>
-                  </div>
-                </div>
+              <Link
+                href="/dashboard"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-xl"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </Link>
+            </div>
+            
+            {/* Contador de espacios */}
+            <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-4 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Espacios disponibles</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+                  {maxPets - petsCount}/{maxPets}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Photo Upload Card Mejorado */}
+          {/* Photo Upload Card */}
           <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md">
@@ -364,12 +370,6 @@ export default function AddPetPage() {
                 <p className="text-sm text-gray-500 mb-4">
                   JPG, PNG o WEBP • Máximo 5MB
                 </p>
-                <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-4 py-2 rounded-full">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Recomendado 800x800 píxeles
-                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -379,7 +379,6 @@ export default function AddPetPage() {
                     alt="Preview"
                     className="w-full h-96 object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                   <button
                     type="button"
                     onClick={removeImage}
@@ -389,16 +388,6 @@ export default function AddPetPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                  {imageFile && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-gray-800 truncate flex-1">{imageFile.name}</span>
-                        <span className="ml-4 text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                          {(imageFile.size / 1024 / 1024).toFixed(2)} MB
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -413,15 +402,12 @@ export default function AddPetPage() {
 
             {imageError && (
               <div className="mt-4 bg-red-50 border-l-4 border-red-500 rounded-xl p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">⚠️</span>
-                  <p className="text-sm text-red-700 font-medium">{imageError}</p>
-                </div>
+                <p className="text-sm text-red-700 font-medium">{imageError}</p>
               </div>
             )}
           </div>
 
-          {/* Basic Information Card Mejorado */}
+          {/* Basic Information Card */}
           <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
@@ -482,7 +468,7 @@ export default function AddPetPage() {
             </div>
           </div>
 
-          {/* Medical & Reward Card Mejorado */}
+          {/* Medical & Reward Card */}
           <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md">
@@ -490,7 +476,7 @@ export default function AddPetPage() {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Información adicional</h3>
-                <p className="text-sm text-gray-500">Detalles importantes para quien encuentre a tu mascota</p>
+                <p className="text-sm text-gray-500">Detalles importantes</p>
               </div>
             </div>
 
@@ -506,14 +492,8 @@ export default function AddPetPage() {
                   onChange={handleChange}
                   rows={4}
                   className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none text-gray-900 placeholder:text-gray-400"
-                  placeholder="Ej: Alergias, medicamentos, condiciones especiales..."
+                  placeholder="Ej: Alergias, medicamentos..."
                 />
-                <div className="mt-3 flex items-start gap-2 bg-blue-50 rounded-xl p-3">
-                  <span className="text-lg">💡</span>
-                  <p className="text-xs text-blue-700 font-medium">
-                    Esta información será visible en la página pública para ayudar a quien encuentre a tu mascota
-                  </p>
-                </div>
               </div>
 
               <div>
@@ -537,23 +517,18 @@ export default function AddPetPage() {
           {saving && uploadProgress > 0 && (
             <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-3xl shadow-lg border border-blue-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center animate-pulse shadow-lg">
-                    <span className="text-2xl">⏳</span>
-                  </div>
-                  <span className="text-sm font-bold text-blue-900">
-                    {uploadProgress < 30 ? 'Creando mascota...' : 
-                     uploadProgress < 100 ? 'Subiendo imagen...' : 
-                     '¡Completado!'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-blue-600 bg-blue-100 px-5 py-2 rounded-xl shadow-sm">
+                <span className="text-sm font-bold text-blue-900">
+                  {uploadProgress < 30 ? 'Creando mascota...' : 
+                   uploadProgress < 100 ? 'Subiendo imagen...' : 
+                   '¡Completado!'}
+                </span>
+                <span className="text-sm font-bold text-blue-600 bg-blue-100 px-5 py-2 rounded-xl">
                   {uploadProgress}%
                 </span>
               </div>
-              <div className="w-full bg-blue-200 rounded-full h-4 overflow-hidden shadow-inner">
+              <div className="w-full bg-blue-200 rounded-full h-4 overflow-hidden">
                 <div 
-                  className="bg-gradient-to-r from-blue-500 to-green-500 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
+                  className="bg-gradient-to-r from-blue-500 to-green-500 h-4 rounded-full transition-all duration-500"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -564,11 +539,9 @@ export default function AddPetPage() {
           {error && (
             <div className="bg-red-50 rounded-3xl shadow-lg border border-red-200 p-6">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                  <span className="text-2xl">❌</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-red-900 mb-1">Error al crear mascota</h4>
+                <span className="text-2xl">❌</span>
+                <div>
+                  <h4 className="text-sm font-bold text-red-900 mb-1">Error</h4>
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               </div>
@@ -576,87 +549,21 @@ export default function AddPetPage() {
           )}
 
           {/* Action Buttons */}
-          <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <button
-                type="button"
-                onClick={() => router.push('/dashboard')}
-                disabled={saving}
-                className="w-full sm:w-auto px-8 py-4 text-sm font-bold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                Cancelar
-              </button>
-              
-              <button
-                type="submit"
-                disabled={saving || !formData.name.trim()}
-                className="w-full sm:w-auto px-12 py-4 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-green-600 rounded-xl hover:from-blue-700 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                {saving ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Guardando...
-                  </span>
-                ) : (
-                  'Agregar Mascota'
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Info Card Mejorado */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl shadow-lg border border-green-200 p-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
-                <span className="text-3xl">🎯</span>
-              </div>
-              <h4 className="text-xl font-bold text-gray-900">¿Qué sucederá después?</h4>
-            </div>
+          <div className="flex items-center justify-between gap-4">
+            <Link
+              href="/dashboard"
+              className="px-8 py-4 text-sm font-bold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
+            >
+              Cancelar
+            </Link>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3 bg-white/80 backdrop-blur-sm rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold shadow-md">
-                  1
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 mb-1">ID único generado</p>
-                  <p className="text-xs text-gray-600">Se creará automáticamente un identificador único</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 bg-white/80 backdrop-blur-sm rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold shadow-md">
-                  2
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 mb-1">Foto guardada</p>
-                  <p className="text-xs text-gray-600">La imagen se almacenará de forma segura</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 bg-white/80 backdrop-blur-sm rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold shadow-md">
-                  3
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 mb-1">Chip NFC preparado</p>
-                  <p className="text-xs text-gray-600">Recibirás el chip programado con el ID</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 bg-white/80 backdrop-blur-sm rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl flex items-center justify-center flex-shrink-0 font-bold shadow-md">
-                  4
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 mb-1">Página pública activa</p>
-                  <p className="text-xs text-gray-600">Disponible inmediatamente tras el registro</p>
-                </div>
-              </div>
-            </div>
+            <button
+              type="submit"
+              disabled={saving || !formData.name.trim()}
+              className="px-12 py-4 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-green-600 rounded-xl hover:from-blue-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+            >
+              {saving ? 'Guardando...' : 'Agregar Mascota'}
+            </button>
           </div>
         </form>
       </div>

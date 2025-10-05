@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SignupPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
   
   const [formData, setFormData] = useState({
     email: '',
@@ -51,8 +50,10 @@ export default function SignupPage() {
       if (data.user) {
         if (data.session) {
           setSuccess('¡Cuenta creada! Redirigiendo...')
-          router.refresh()
+          // Esperar para que la sesión se establezca
+          await new Promise(resolve => setTimeout(resolve, 500))
           router.push('/dashboard')
+          router.refresh()
         } else {
           setSuccess('¡Cuenta creada! Revisa tu email para activarla.')
         }
@@ -72,9 +73,7 @@ export default function SignupPage() {
           {/* Logo y título */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-green-600 rounded-2xl shadow-lg mb-4">
-              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1H2a1 1 0 01-1-1V7a1 1 0 011-1h.5a1.5 1.5 0 000-3H2a1 1 0 01-1-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
-              </svg>
+              <span className="text-4xl">🐾</span>
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
               Crear Cuenta

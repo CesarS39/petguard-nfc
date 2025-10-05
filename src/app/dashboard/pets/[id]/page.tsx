@@ -22,7 +22,7 @@ export default function EditPetPage() {
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [userId, setUserId] = useState<string>("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -39,37 +39,39 @@ export default function EditPetPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchPet = async () => {
       try {
-        // Verificar autenticación PRIMERO
-        const {
-          data: { session },
-          error: authError,
-        } = await supabase.auth.getSession();
-        const user = session?.user;
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
 
-        if (authError || !user) {
+        if (!session?.user) {
           router.replace("/auth/login");
           return;
         }
 
-        // Verificar que la mascota existe Y pertenece al usuario
+        setUserId(session.user.id);
+
+        // Obtener datos de la mascota
         const { data: petData, error: petError } = await supabase
           .from("pets")
           .select("*")
           .eq("id", params.id)
-          .eq("user_id", user.id)
+          .eq("user_id", session.user.id)
           .single();
 
+        if (!mounted) return;
+
         if (petError || !petData) {
-          setError("Mascota no encontrada o no tienes permiso para editarla");
-          setLoading(false);
-          setTimeout(() => router.replace("/dashboard"), 2000);
+          setError("Mascota no encontrada o sin permisos");
+          setTimeout(() => {
+            if (mounted) router.replace("/dashboard");
+          }, 2000);
           return;
         }
 
-        // Solo si todo está OK, mostrar el contenido
-        setIsAuthorized(true);
         setFormData({
           name: petData.name || "",
           breed: petData.breed || "",
@@ -79,18 +81,23 @@ export default function EditPetPage() {
           is_active: petData.is_active,
         });
         setCurrentPhotoUrl(petData.photo_url);
-      } catch (error: any) {
-        console.error("Error:", error);
-        setError("Error al cargar la información");
-        setTimeout(() => router.replace("/dashboard"), 2000);
-      } finally {
         setLoading(false);
+      } catch (error: any) {
+        console.error("Error fetching pet:", error);
+        if (mounted) {
+          setError("Error al cargar la información");
+          setTimeout(() => router.replace("/dashboard"), 2000);
+        }
       }
     };
 
     if (params.id) {
       fetchPet();
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [params.id, router]);
 
   const handleChange = (
@@ -186,21 +193,11 @@ export default function EditPetPage() {
     if (!window.confirm("¿Estás seguro de eliminar la foto actual?")) return;
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-      
-      if (!user) {
-        router.replace("/auth/login");
-        return;
-      }
-
       const { error } = await supabase
         .from("pets")
         .update({ photo_url: null })
         .eq("id", params.id)
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) throw error;
 
@@ -212,10 +209,7 @@ export default function EditPetPage() {
     }
   };
 
-  const uploadImage = async (
-    petId: string,
-    userId: string
-  ): Promise<string | null> => {
+  const uploadImage = async (petId: string): Promise<string | null> => {
     if (!imageFile) return null;
 
     try {
@@ -256,22 +250,12 @@ export default function EditPetPage() {
     setUploadProgress(0);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-      
-      if (!user) {
-        router.replace("/auth/login");
-        return;
-      }
-
       setUploadProgress(10);
 
       let photoUrl = currentPhotoUrl;
 
       if (imageFile) {
-        photoUrl = await uploadImage(params.id as string, user.id);
+        photoUrl = await uploadImage(params.id as string);
       }
 
       const { error: updateError } = await supabase
@@ -282,7 +266,7 @@ export default function EditPetPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", params.id)
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (updateError) throw updateError;
 
@@ -293,6 +277,7 @@ export default function EditPetPage() {
 
       setTimeout(() => {
         router.push("/dashboard");
+        router.refresh();
       }, 2000);
     } catch (error: any) {
       setError(error.message || "Error al actualizar mascota");
@@ -302,42 +287,44 @@ export default function EditPetPage() {
     }
   };
 
-  // Mostrar pantalla de carga mientras verificamos
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-emerald-50 flex items-center justify-center">
         <div className="text-center">
           <div className="relative">
             <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-500 border-t-transparent mx-auto"></div>
-            <div className="absolute inset-0 animate-pulse rounded-full h-20 w-20 border-4 border-emerald-400/30 mx-auto"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl">🐾</span>
+            </div>
           </div>
           <p className="mt-6 text-slate-700 text-lg font-semibold">
-            Verificando permisos...
+            Cargando información...
           </p>
         </div>
       </div>
     );
   }
 
-  // Si hay error de autorización, mostrar mensaje
-  if (!isAuthorized) {
+  if (error && !formData.name) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-emerald-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md mx-auto bg-white rounded-2xl p-8 shadow-xl border border-slate-200">
           <div className="mb-6 text-8xl">🔒</div>
           <h2 className="text-3xl font-bold text-slate-800 mb-4">
-            Acceso Denegado
+            Error al cargar
           </h2>
-          <p className="text-slate-600 mb-6 text-lg">
-            {error || "No tienes permiso para editar esta mascota"}
-          </p>
-          <p className="text-sm text-slate-500">Redirigiendo al dashboard...</p>
+          <p className="text-slate-600 mb-6 text-lg">{error}</p>
+          <Link
+            href="/dashboard"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Volver al Dashboard
+          </Link>
         </div>
       </div>
     );
   }
 
-  // Solo si está autorizado, mostrar el formulario
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-emerald-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
@@ -491,16 +478,6 @@ export default function EditPetPage() {
                     </svg>
                   </button>
                 </div>
-                {imageFile && (
-                  <div className="flex items-center justify-between bg-slate-50 rounded-xl p-4 border border-slate-200">
-                    <span className="text-sm font-medium text-slate-700 truncate flex-1">
-                      {imageFile.name}
-                    </span>
-                    <span className="ml-4 text-sm font-bold text-blue-600">
-                      {(imageFile.size / 1024 / 1024).toFixed(2)} MB
-                    </span>
-                  </div>
-                )}
               </div>
             ) : (
               <div
@@ -529,12 +506,9 @@ export default function EditPetPage() {
 
             {imageError && (
               <div className="mt-4 bg-red-50 border-l-4 border-red-500 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-xl">⚠️</span>
-                  <p className="text-sm text-red-700 font-medium">
-                    {imageError}
-                  </p>
-                </div>
+                <p className="text-sm text-red-700 font-medium">
+                  {imageError}
+                </p>
               </div>
             )}
           </div>
@@ -657,25 +631,20 @@ export default function EditPetPage() {
           {saving && uploadProgress > 0 && (
             <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-3xl shadow-sm border border-blue-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center animate-pulse">
-                    <span className="text-xl">⏳</span>
-                  </div>
-                  <span className="text-sm font-semibold text-blue-900">
-                    {uploadProgress < 30
-                      ? "Actualizando información..."
-                      : uploadProgress < 100
-                      ? "Subiendo nueva imagen..."
-                      : "Completado"}
-                  </span>
-                </div>
+                <span className="text-sm font-semibold text-blue-900">
+                  {uploadProgress < 30
+                    ? "Actualizando información..."
+                    : uploadProgress < 100
+                    ? "Subiendo nueva imagen..."
+                    : "Completado"}
+                </span>
                 <span className="text-sm font-bold text-blue-600 bg-blue-100 px-4 py-2 rounded-xl">
                   {uploadProgress}%
                 </span>
               </div>
               <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-500 ease-out"
+                  className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-500"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -686,10 +655,8 @@ export default function EditPetPage() {
           {successMessage && (
             <div className="bg-emerald-50 rounded-3xl shadow-sm border border-emerald-200 p-6">
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">✅</span>
-                </div>
-                <div className="flex-1">
+                <span className="text-2xl">✅</span>
+                <div>
                   <h4 className="text-sm font-bold text-emerald-900 mb-1">
                     Éxito
                   </h4>
@@ -700,13 +667,11 @@ export default function EditPetPage() {
           )}
 
           {/* Error Message */}
-          {error && (
+          {error && formData.name && (
             <div className="bg-red-50 rounded-3xl shadow-sm border border-red-200 p-6">
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">❌</span>
-                </div>
-                <div className="flex-1">
+                <span className="text-2xl">❌</span>
+                <div>
                   <h4 className="text-sm font-bold text-red-900 mb-1">Error</h4>
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
@@ -715,45 +680,21 @@ export default function EditPetPage() {
           )}
 
           {/* Action Buttons */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <Link
-                href="/dashboard"
-                className="w-full sm:w-auto px-8 py-3.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition-all text-center"
-              >
-                Cancelar
-              </Link>
+          <div className="flex items-center justify-between gap-4">
+            <Link
+              href="/dashboard"
+              className="px-8 py-3.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all"
+            >
+              Cancelar
+            </Link>
 
-              <button
-                type="submit"
-                disabled={saving || !formData.name.trim()}
-                className="w-full sm:w-auto px-10 py-3.5 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl hover:from-blue-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                {saving ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Guardando...
-                  </span>
-                ) : (
-                  "Guardar Cambios"
-                )}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={saving || !formData.name.trim()}
+              className="px-10 py-3.5 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+            >
+              {saving ? "Guardando..." : "Guardar Cambios"}
+            </button>
           </div>
         </form>
       </div>

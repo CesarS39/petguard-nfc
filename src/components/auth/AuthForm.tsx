@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 interface AuthFormProps {
@@ -19,8 +19,6 @@ function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  
-  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,12 +43,11 @@ function AuthForm({ mode }: AuthFormProps) {
         if (error) throw error
         
         if (data.user && data.session) {
-          // Email confirmation deshabilitado
           setSuccess('¡Cuenta creada! Redirigiendo...')
+          await new Promise(resolve => setTimeout(resolve, 500))
           router.refresh()
           router.push('/dashboard')
         } else {
-          // Email confirmation habilitado
           setSuccess('Registro exitoso! Revisa tu email para confirmar tu cuenta.')
         }
       } else {
@@ -62,11 +59,9 @@ function AuthForm({ mode }: AuthFormProps) {
         if (error) throw error
         
         if (data.session) {
-          setSuccess('Inicio de sesión exitoso!')
-          // IMPORTANTE: Refrescar para que el middleware detecte la sesión
+          setSuccess('Iniciando sesión...')
+          await new Promise(resolve => setTimeout(resolve, 500))
           router.refresh()
-          // Esperar un momento y redirigir
-          await new Promise(resolve => setTimeout(resolve, 100))
           router.push('/dashboard')
         }
       }
@@ -225,15 +220,11 @@ function AuthForm({ mode }: AuthFormProps) {
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
-      {/* Sección izquierda - Formulario */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 bg-white">
         <div className="max-w-md w-full">
-          {/* Logo y título */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-green-600 rounded-2xl shadow-lg mb-4">
-              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1H2a1 1 0 01-1-1V7a1 1 0 011-1h.5a1.5 1.5 0 000-3H2a1 1 0 01-1-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
-              </svg>
+              <span className="text-4xl">🐾</span>
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
               Bienvenido a PetGuard
@@ -257,7 +248,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Características */}
           <div className="mt-8 pt-8 border-t border-gray-200">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
@@ -289,7 +279,6 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Sección derecha - Hero visual (oculto en móvil) */}
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 via-blue-700 to-green-600 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxIDEuNzktNCA0LTRzNCAxLjc5IDQgNC0xLjc5IDQtNCA0LTQtMS43OS00LTR6bTAgMTBjMC0yLjIxIDEuNzktNCA0LTRzNCAxLjc5IDQgNC0xLjc5IDQtNCA0LTQtMS43OS00LTR6TTE2IDM0YzAtMi4yMSAxLjc5LTQgNC00czQgMS43OSA0IDQtMS43OSA0LTQgNC00LTEuNzktNC00em0wIDEwYzAtMi4yMSAxLjc5LTQgNC00czQgMS43OSA0IDQtMS43OSA0LTQgNC00LTEuNzktNC00eiIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
         
