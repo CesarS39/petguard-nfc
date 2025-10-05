@@ -156,8 +156,7 @@ export default function DashboardPage() {
       >
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-2">
-              <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center space-x-2">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-green-600 rounded-xl flex items-center justify-center">
                   <span className="text-2xl grayscale brightness-0 invert">
                     🐾
@@ -167,10 +166,6 @@ export default function DashboardPage() {
                   PetGuard
                 </span>
               </Link>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-                PetGuard
-              </span>
-            </div>
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="lg:hidden text-gray-500 hover:text-gray-700"
