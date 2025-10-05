@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import LogoutButton from "@/components/auth/LogoutButton";
 import Link from "next/link";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const supabase = createClientComponentClient();
+  
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -15,67 +17,86 @@ export default function DashboardPage() {
   const [reportsCount, setReportsCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
- useEffect(() => {
-  const getUser = async () => {
-    try {
-      // Usar getSession en lugar de getUser para consistencia con middleware
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session || !session.user) {
-        console.log("No hay sesión, redirigiendo...");
+  useEffect(() => {
+    // Timeout de seguridad de 5 segundos
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn('Timeout: redirigiendo al login');
+        setLoading(false);
         router.push("/auth/login");
-        return;
       }
+    }, 5000);
 
-      const user = session.user;
-      setUser(user);
+    const getUser = async () => {
+      try {
+        // Usar getSession en lugar de getUser para consistencia con middleware
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      // Cargar perfil
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+        if (!session || !session.user) {
+          console.log("No hay sesión, redirigiendo...");
+          router.push("/auth/login");
+          return;
+        }
 
-      setProfile(profileData);
+        const user = session.user;
+        setUser(user);
 
-      // Cargar mascotas
-      const { data: petsData } = await supabase
-        .from("pets")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        // Cargar perfil
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
 
-      setPets(petsData || []);
+        setProfile(profileData);
 
-      // Contar reportes
-      if (petsData && petsData.length > 0) {
-        const { count } = await supabase
-          .from("found_reports")
-          .select("*", { count: "exact", head: true })
-          .in("pet_id", petsData.map((p) => p.id));
+        // Cargar mascotas
+        const { data: petsData } = await supabase
+          .from("pets")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
 
-        setReportsCount(count || 0);
+        setPets(petsData || []);
+
+        // Contar reportes
+        if (petsData && petsData.length > 0) {
+          const { count } = await supabase
+            .from("found_reports")
+            .select("*", { count: "exact", head: true })
+            .in(
+              "pet_id",
+              petsData.map((p) => p.id)
+            );
+
+          setReportsCount(count || 0);
+        }
+      } catch (error) {
+        console.error("Error en dashboard:", error);
+        router.push("/auth/login");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error en dashboard:", error);
-      router.push("/auth/login");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  getUser();
+    getUser();
 
-  // Escuchar cambios de autenticación
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT' || !session) {
-      router.push("/auth/login");
-    }
-  });
+    // Escuchar cambios de autenticación
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        router.push("/auth/login");
+      }
+    });
 
-  return () => subscription.unsubscribe();
-}, [supabase, router]);
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
+  }, [supabase, router, loading]);
 
   const handleEditPet = (petId: string) => {
     router.push(`/dashboard/pets/${petId}`);
@@ -84,7 +105,6 @@ export default function DashboardPage() {
   const handleViewPublicPage = (shortId: string) => {
     window.open(`/pet/${shortId}`, "_blank");
   };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -137,11 +157,16 @@ export default function DashboardPage() {
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-green-600 rounded-xl flex items-center justify-center">
-                <span className="text-2xl grayscale brightness-0 invert">
-                  🐾
+              <Link href="/" className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-green-600 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl grayscale brightness-0 invert">
+                    🐾
+                  </span>
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+                  PetGuard
                 </span>
-              </div>
+              </Link>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
                 PetGuard
               </span>

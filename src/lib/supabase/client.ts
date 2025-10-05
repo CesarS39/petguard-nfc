@@ -1,7 +1,17 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// Cliente para componentes del frontend con manejo automático de cookies
-export const supabase = createClientComponentClient<Database>()
+// Cliente para componentes del frontend con persistencia de sesión
+export const supabase = createClientComponentClient<Database>({
+  options: {
+    auth: {
+      persistSession: true,
+      storageKey: 'petguard-auth',
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+})
 
 // Tipos para TypeScript
 export type Database = {

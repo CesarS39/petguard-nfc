@@ -15,6 +15,7 @@ import {
   Heart,
   User
 } from 'lucide-react';
+import LogoutButton from '../auth/LogoutButton';
 
 interface NavbarProps {
   user?: {
@@ -111,13 +112,7 @@ export default function Navbar({ user }: NavbarProps) {
                 <p className="text-blue-600 text-xs font-semibold">ADMIN</p>
               )}
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors px-3 py-2 rounded-md hover:bg-red-50"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Salir</span>
-            </button>
+            <LogoutButton />
           </div>
 
           {/* Mobile menu button */}
@@ -165,13 +160,7 @@ export default function Navbar({ user }: NavbarProps) {
               })}
 
               {/* Logout button on mobile */}
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center space-x-2 text-red-600 hover:text-red-700 transition-colors px-3 py-2 rounded-md hover:bg-red-50 mt-4 border-t border-gray-200 pt-4"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Cerrar Sesión</span>
-              </button>
+              <LogoutButton />
             </div>
           </div>
         )}
