@@ -1,72 +1,39 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  
+  // Crear el cliente de Supabase para middleware
+  const supabase = createMiddlewareClient({ req, res })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          // Actualizar cookies en la request
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          // Actualizar cookies en la response
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          // Remover de la request
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          // Remover de la response
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
-  )
-
-  // CRÍTICO: Obtener la sesión refrescándola
+  // CRÍTICO: Refrescar la sesión
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // Proteger rutas del dashboard
-  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
-    const redirectUrl = new URL('/auth/login', request.url)
+  console.log('=== MIDDLEWARE ===')
+  console.log('Path:', req.nextUrl.pathname)
+  console.log('Session exists:', !!session)
+  console.log('User:', session?.user?.email)
+
+  // Si NO hay sesión y está intentando acceder al dashboard
+  if (!session && req.nextUrl.pathname.startsWith('/dashboard')) {
+    console.log('❌ No session, redirecting to login')
+    const redirectUrl = new URL('/auth/login', req.url)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Si está autenticado y va al login o signup, redirigir al dashboard
-  if (session && (request.nextUrl.pathname === '/auth/login' || request.nextUrl.pathname === '/auth/signup')) {
-    const redirectUrl = new URL('/dashboard', request.url)
+  // Si HAY sesión y está en login/signup
+  if (session && (req.nextUrl.pathname === '/auth/login' || req.nextUrl.pathname === '/auth/signup')) {
+    console.log('✅ Has session, redirecting to dashboard')
+    const redirectUrl = new URL('/dashboard', req.url)
     return NextResponse.redirect(redirectUrl)
   }
 
-  return response
+  console.log('✅ Allowing request to:', req.nextUrl.pathname)
+  return res
 }
 
 export const config = {
@@ -74,5 +41,5 @@ export const config = {
     '/dashboard/:path*',
     '/auth/login',
     '/auth/signup',
-  ]
+  ],
 }

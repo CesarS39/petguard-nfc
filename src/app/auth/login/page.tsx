@@ -1,44 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [debugInfo, setDebugInfo] = useState<any>(null)
   
   const supabase = createClientComponentClient()
-
-  // Verificar sesión al cargar
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      console.log('Sesión actual:', session)
-      setDebugInfo(prev => ({ ...prev, sessionOnLoad: session }))
-      
-      if (session) {
-        console.log('Ya hay sesión, redirigiendo...')
-        router.push('/dashboard')
-      }
-    }
-    checkSession()
-  }, [supabase, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess('')
-
-    console.log('=== INICIANDO LOGIN ===')
-    console.log('URL actual:', window.location.href)
 
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -46,36 +23,15 @@ export default function LoginPage() {
         password,
       })
 
-      console.log('Respuesta de signIn:', { data, error: signInError })
-      setDebugInfo({ signInData: data, signInError })
-
       if (signInError) throw signInError
       
       if (data.session) {
-        console.log('✅ Sesión creada:', data.session)
-        setSuccess('Inicio de sesión exitoso!')
-        
-        // Verificar que la sesión se guardó
-        const { data: { session: verifySession } } = await supabase.auth.getSession()
-        console.log('Sesión verificada después de login:', verifySession)
-        
-        // Intentar redirección
-        console.log('Intentando redirigir a /dashboard')
-        
-        // Opción 1: Usar window.location (más confiable en producción)
+        // CRÍTICO: En producción, usar window.location es más confiable
+        // que router.push porque garantiza que el middleware vea la sesión
         window.location.href = '/dashboard'
-        
-        // Opción 2: Si la anterior no funciona, descomentar estas:
-        // router.refresh()
-        // await new Promise(resolve => setTimeout(resolve, 500))
-        // router.push('/dashboard')
-      } else {
-        console.log('❌ No hay sesión en la respuesta')
-        setError('No se pudo crear la sesión')
       }
     } catch (error: any) {
-      console.error('❌ Error en login:', error)
-      setDebugInfo(prev => ({ ...prev, error }))
+      console.error('Error en login:', error)
       
       if (error.message?.includes('Invalid login credentials')) {
         setError('Credenciales inválidas. Verifica tu email y contraseña.')
@@ -93,15 +49,20 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Iniciar Sesión</h2>
-          <p className="mt-2 text-gray-600">PetGuard</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-green-600 rounded-2xl shadow-lg mb-4">
+            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1H2a1 1 0 01-1-1V7a1 1 0 011-1h.5a1.5 1.5 0 000-3H2a1 1 0 01-1-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Bienvenido a PetGuard</h2>
+          <p className="text-gray-600">Protege a tus mascotas con tecnología NFC</p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                Correo electrónico
               </label>
               <input
                 id="email"
@@ -109,13 +70,13 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                 placeholder="tu@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
                 Contraseña
               </label>
               <input
@@ -124,7 +85,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                 placeholder="••••••••"
                 minLength={6}
               />
@@ -132,39 +93,28 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
-
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded-md p-3">
-              <p className="text-sm text-green-700">{success}</p>
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <p className="text-sm text-red-700 font-medium">{error}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-green-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
           >
             {loading ? 'Procesando...' : 'Iniciar Sesión'}
           </button>
         </form>
 
         <div className="text-center">
-          <Link href="/auth/signup" className="text-sm text-blue-600 hover:text-blue-500">
-            ¿No tienes cuenta? Regístrate
-          </Link>
+          <p className="text-sm text-gray-600">
+            ¿No tienes cuenta?{' '}
+            <Link href="/auth/signup" className="font-semibold text-blue-600 hover:text-blue-700">
+              Regístrate gratis
+            </Link>
+          </p>
         </div>
-
-        {/* DEBUG INFO */}
-        {debugInfo && (
-          <details className="mt-4 p-4 bg-gray-100 rounded text-xs">
-            <summary className="cursor-pointer font-medium">Debug Info (click para expandir)</summary>
-            <pre className="mt-2 overflow-auto">{JSON.stringify(debugInfo, null, 2)}</pre>
-          </details>
-        )}
       </div>
     </div>
   )
