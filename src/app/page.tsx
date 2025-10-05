@@ -238,8 +238,8 @@ export default function LandingPage() {
           
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md mx-auto">
             <div className="mb-8">
-              <div className="text-5xl font-bold text-blue-600 mb-2">$299</div>
-              <div className="text-gray-600">MXN • Pago único</div>
+              <div className="text-5xl font-bold text-blue-600 mb-2">$50</div>
+              <div className="text-gray-600">MXN • Pago mensual</div>
             </div>
             
             <ul className="space-y-4 mb-8 text-left">
