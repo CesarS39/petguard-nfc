@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface FoundReportFormProps {
   petId: string
@@ -9,6 +9,7 @@ interface FoundReportFormProps {
 }
 
 export default function FoundReportForm({ petId, petName }: FoundReportFormProps) {
+  const supabase = createClientComponentClient()
   const [formData, setFormData] = useState({
     finder_name: '',
     finder_phone: '',
@@ -42,11 +43,18 @@ export default function FoundReportForm({ petId, petName }: FoundReportFormProps
         }
         setLocation(coords)
         
-        // Agregar coordenadas al campo location
-        setFormData({
-          ...formData,
-          location: formData.location + ` (Lat: ${coords.lat.toFixed(6)}, Lng: ${coords.lng.toFixed(6)})`
-        })
+        // Usar coordenadas como ubicación si el campo está vacío
+        if (!formData.location.trim()) {
+          setFormData({
+            ...formData,
+            location: `Lat: ${coords.lat.toFixed(6)}, Lng: ${coords.lng.toFixed(6)}`
+          })
+        } else {
+          setFormData({
+            ...formData,
+            location: formData.location + ` (Lat: ${coords.lat.toFixed(6)}, Lng: ${coords.lng.toFixed(6)})`
+          })
+        }
       },
       (error) => {
         console.error('Error getting location:', error)
@@ -65,10 +73,10 @@ export default function FoundReportForm({ petId, petName }: FoundReportFormProps
         .from('found_reports')
         .insert([{
           pet_id: petId,
-          finder_name: formData.finder_name,
+          finder_name: formData.finder_name || 'Anónimo',
           finder_phone: formData.finder_phone || null,
           finder_email: formData.finder_email || null,
-          location: formData.location || null,
+          location: formData.location,
           latitude: location?.lat || null,
           longitude: location?.lng || null,
           message: formData.message || null
@@ -87,19 +95,19 @@ export default function FoundReportForm({ petId, petName }: FoundReportFormProps
   if (submitted) {
     return (
       <div className="text-center py-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full mb-4 shadow-xl">
+          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
           </svg>
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+        <h3 className="text-2xl font-black text-gray-900 mb-3">
           ¡Reporte enviado!
         </h3>
-        <p className="text-gray-600 mb-4">
-          El dueño de {petName} ha sido notificado. Te contactará pronto.
+        <p className="text-gray-600 mb-6 text-lg">
+          La familia de {petName} ha sido notificada y te contactará pronto.
         </p>
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <p className="text-sm text-blue-700">
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-5">
+          <p className="text-sm text-blue-800 font-medium">
             <strong>Mantén a {petName} seguro</strong> mientras llega su familia. 
             Ofrécele agua y un lugar cómodo para descansar.
           </p>
@@ -109,115 +117,117 @@ export default function FoundReportForm({ petId, petName }: FoundReportFormProps
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Nombre del finder */}
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Ubicación - OBLIGATORIO */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Tu nombre *
-        </label>
-        <input
-          type="text"
-          name="finder_name"
-          required
-          value={formData.finder_name}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="¿Cómo te llamas?"
-        />
-      </div>
-
-      {/* Contacto */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tu teléfono
-          </label>
-          <input
-            type="tel"
-            name="finder_phone"
-            value={formData.finder_phone}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Tu número"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tu email
-          </label>
-          <input
-            type="email"
-            name="finder_email"
-            value={formData.finder_email}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="tu@email.com"
-          />
-        </div>
-      </div>
-
-      {/* Ubicación */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          ¿Dónde encontraste a {petName}?
+        <label className="block text-sm font-bold text-gray-800 mb-2">
+          ¿Dónde encontraste a {petName}? <span className="text-red-500">*</span>
         </label>
         <div className="flex gap-2">
           <input
             type="text"
             name="location"
+            required
             value={formData.location}
             onChange={handleChange}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Ej: Parque Central, Calle 5 con Carrera 10..."
+            className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="Ej: Parque Central, Calle 5..."
           />
           <button
             type="button"
             onClick={getLocation}
-            className="px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm whitespace-nowrap"
+            className="px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 text-sm font-bold whitespace-nowrap transition-all shadow-md"
           >
-            📍 Mi ubicación
+            📍 GPS
           </button>
         </div>
         {location && (
-          <p className="text-xs text-green-600 mt-1">
+          <p className="text-xs text-green-600 mt-2 font-medium">
             ✓ Ubicación GPS agregada
           </p>
         )}
       </div>
 
-      {/* Mensaje adicional */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Información adicional (opcional)
-        </label>
-        <textarea
-          name="message"
-          value={formData.message}
-          onChange={handleChange}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder={`Cuéntanos cómo está ${petName}, si necesita atención médica, etc.`}
-        />
+      {/* Campos opcionales */}
+      <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+        <p className="text-sm font-bold text-gray-700">Información de contacto <span className="text-gray-400 font-normal">(opcional)</span></p>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tu nombre
+          </label>
+          <input
+            type="text"
+            name="finder_name"
+            value={formData.finder_name}
+            onChange={handleChange}
+            className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            placeholder="¿Cómo te llamas?"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tu teléfono
+            </label>
+            <input
+              type="tel"
+              name="finder_phone"
+              value={formData.finder_phone}
+              onChange={handleChange}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              placeholder="Tu número"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tu email
+            </label>
+            <input
+              type="email"
+              name="finder_email"
+              value={formData.finder_email}
+              onChange={handleChange}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              placeholder="tu@email.com"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Mensaje adicional
+          </label>
+          <textarea
+            name="message"
+            value={formData.message}
+            onChange={handleChange}
+            rows={3}
+            className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+            placeholder={`Cuéntanos cómo está ${petName}...`}
+          />
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+          <p className="text-sm text-red-700 font-medium">{error}</p>
         </div>
       )}
 
       {/* Submit */}
       <button
         type="submit"
-        disabled={loading || !formData.finder_name}
-        className="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
+        disabled={loading || !formData.location.trim()}
+        className="w-full bg-gradient-to-r from-blue-600 to-green-600 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl font-bold text-lg"
       >
         {loading ? 'Enviando...' : `🚀 Notificar que encontré a ${petName}`}
       </button>
 
       <p className="text-xs text-gray-500 text-center">
-        Al enviar este reporte, el dueño recibirá tu información de contacto para coordinar el reencuentro
+        Solo la ubicación es obligatoria. Tu información de contacto ayudará al dueño a coordinarse contigo.
       </p>
     </form>
   )
