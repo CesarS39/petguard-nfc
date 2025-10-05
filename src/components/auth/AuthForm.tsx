@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -9,6 +10,7 @@ interface AuthFormProps {
 }
 
 function AuthForm({ mode }: AuthFormProps) {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -26,40 +28,44 @@ function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (mode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: fullName,
               phone: phone,
-            }
+            },
+            emailRedirectTo: `${window.location.origin}/dashboard`
           }
         })
 
         if (error) throw error
         setSuccess('Registro exitoso! Revisa tu email para confirmar tu cuenta.')
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (error) throw error
-        if (data.user) {
-          setSuccess('Inicio de sesión exitoso! Redirigiendo...')
-          setTimeout(() => {
-            window.location.href = '/dashboard'
-          }, 1000)
-        }
+        
+        setSuccess('Inicio de sesión exitoso!')
+        
+        // Usar router.push en vez de window.location
+        // Y dar tiempo para que la cookie se establezca
+        await new Promise(resolve => setTimeout(resolve, 500))
+        router.push('/dashboard')
+        router.refresh()
       }
-    } catch (error: any) {
-      if (error.message?.includes('Invalid login credentials')) {
+    } catch (error: unknown) {
+      const err = error as { message?: string }
+      if (err.message?.includes('Invalid login credentials')) {
         setError('Credenciales inválidas. Verifica tu email y contraseña.')
-      } else if (error.message?.includes('Email not confirmed')) {
+      } else if (err.message?.includes('Email not confirmed')) {
         setError('Debes confirmar tu email antes de iniciar sesión.')
       } else {
-        setError(error.message || 'Ha ocurrido un error')
+        setError(err.message || 'Ha ocurrido un error')
       }
     } finally {
       setLoading(false)
