@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 
 interface AuthFormProps {
@@ -19,6 +19,8 @@ function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  
+  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +30,7 @@ function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -36,27 +38,37 @@ function AuthForm({ mode }: AuthFormProps) {
               full_name: fullName,
               phone: phone,
             },
-            emailRedirectTo: `${window.location.origin}/dashboard`
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         })
 
         if (error) throw error
-        setSuccess('Registro exitoso! Revisa tu email para confirmar tu cuenta.')
+        
+        if (data.user && data.session) {
+          // Email confirmation deshabilitado
+          setSuccess('¡Cuenta creada! Redirigiendo...')
+          router.refresh()
+          router.push('/dashboard')
+        } else {
+          // Email confirmation habilitado
+          setSuccess('Registro exitoso! Revisa tu email para confirmar tu cuenta.')
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (error) throw error
         
-        setSuccess('Inicio de sesión exitoso!')
-        
-        // Usar router.push en vez de window.location
-        // Y dar tiempo para que la cookie se establezca
-        await new Promise(resolve => setTimeout(resolve, 500))
-        router.push('/dashboard')
-        router.refresh()
+        if (data.session) {
+          setSuccess('Inicio de sesión exitoso!')
+          // IMPORTANTE: Refrescar para que el middleware detecte la sesión
+          router.refresh()
+          // Esperar un momento y redirigir
+          await new Promise(resolve => setTimeout(resolve, 100))
+          router.push('/dashboard')
+        }
       }
     } catch (error: unknown) {
       const err = error as { message?: string }

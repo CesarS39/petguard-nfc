@@ -1,10 +1,9 @@
-// middleware.ts (en la raíz del proyecto)
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -19,33 +18,52 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: { headers: request.headers },
+          // Actualizar cookies en la request
+          request.cookies.set({
+            name,
+            value,
+            ...options,
           })
-          response.cookies.set({ name, value, ...options })
+          // Actualizar cookies en la response
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
         },
         remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: { headers: request.headers },
+          // Remover de la request
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
           })
-          response.cookies.set({ name, value: '', ...options })
+          // Remover de la response
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
         },
       },
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // CRÍTICO: Obtener la sesión refrescándola
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
   // Proteger rutas del dashboard
   if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    const redirectUrl = new URL('/auth/login', request.url)
+    return NextResponse.redirect(redirectUrl)
   }
 
-  // Si está autenticado y va al login, redirigir al dashboard
-  if (session && request.nextUrl.pathname === '/auth/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Si está autenticado y va al login o signup, redirigir al dashboard
+  if (session && (request.nextUrl.pathname === '/auth/login' || request.nextUrl.pathname === '/auth/signup')) {
+    const redirectUrl = new URL('/dashboard', request.url)
+    return NextResponse.redirect(redirectUrl)
   }
 
   return response
@@ -55,5 +73,6 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/auth/login',
+    '/auth/signup',
   ]
 }
