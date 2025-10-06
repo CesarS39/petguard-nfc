@@ -2,51 +2,49 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import FoundReportForm from '@/components/pets/FoundReportForm'
 import Link from 'next/link'
 
+interface PetData {
+  id: string
+  name: string
+  breed: string | null
+  age: string | null
+  medical_conditions: string | null
+  photo_url: string | null
+  reward: string | null
+  owner: {
+    full_name: string
+    phone: string | null
+    email: string | null
+  }
+}
+
 export default function PublicPetPage() {
   const params = useParams()
-  const supabase = createClientComponentClient()
-  const [pet, setPet] = useState<any>(null)
+  const [pet, setPet] = useState<PetData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchPet = async () => {
       try {
-        const { data: petData, error: petError } = await supabase
-          .from('pets')
-          .select('*')
-          .eq('short_id', params.id)
-          .eq('is_active', true)
-          .single()
+        console.log('🔍 Buscando mascota:', params.id)
 
-        if (petError) throw petError
-        if (!petData) {
-          setError('Mascota no encontrada')
-          return
+        // Llamar a nuestra API segura
+        const response = await fetch(`/api/pet/${params.id}`)
+        
+        if (!response.ok) {
+          throw new Error('Mascota no encontrada')
         }
 
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('full_name, phone, email')
-          .eq('user_id', petData.user_id)
-          .single()
-
-        const combinedData = {
-          ...petData,
-          profiles: profileData || { 
-            full_name: 'Dueño no disponible', 
-            phone: null, 
-            email: 'No disponible' 
-          }
-        }
-
-        setPet(combinedData)
+        const data = await response.json()
+        console.log('✅ Datos recibidos:', data)
+        
+        setPet(data)
       } catch (error: any) {
-        setError('Error al cargar la información')
+        console.error('❌ Error:', error)
+        setError(error.message)
       } finally {
         setLoading(false)
       }
@@ -55,12 +53,11 @@ export default function PublicPetPage() {
     if (params.id) {
       fetchPet()
     }
-  }, [params.id, supabase])
+  }, [params.id])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-green-50 flex items-center justify-center relative overflow-hidden">
-        {/* Animated background circles */}
         <div className="absolute top-20 left-20 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
         <div className="absolute top-40 right-20 w-72 h-72 bg-cyan-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
         <div className="absolute -bottom-8 left-40 w-72 h-72 bg-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
@@ -114,7 +111,7 @@ export default function PublicPetPage() {
     )
   }
 
-  const owner = pet.profiles
+  const owner = pet.owner
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-cyan-50 to-green-100 relative overflow-hidden">
@@ -162,10 +159,8 @@ export default function PublicPetPage() {
         {pet.photo_url && (
           <div className="flex justify-center -mt-4 px-4">
             <div className="relative group">
-              {/* Glow effect */}
               <div className="absolute -inset-4 sm:-inset-8 bg-gradient-to-r from-blue-600 via-cyan-600 to-green-500 rounded-full blur-2xl opacity-40 group-hover:opacity-60 transition-opacity animate-pulse"></div>
               
-              {/* Photo frame */}
               <div className="relative">
                 <div className="absolute -inset-4 sm:-inset-6 bg-gradient-to-r from-blue-400 via-cyan-400 to-green-400 rounded-full animate-spin-slow"></div>
                 <div className="relative bg-white p-2 sm:p-3 rounded-full">
@@ -177,23 +172,20 @@ export default function PublicPetPage() {
                 </div>
               </div>
 
-              {/* Floating hearts */}
-              <div className="absolute -top-6 -right-6 sm:-top-8 sm:-right-8 text-3xl sm:text-4xl animate-bounce">💕</div>
+              <div className="absolute -top-6 -right-6 sm:-top-8 sm:-right-8 text-3xl sm:text-4xl animate-bounce">🏠</div>
               <div className="absolute -bottom-6 -left-6 sm:-bottom-8 sm:-left-8 text-4xl sm:text-5xl animate-bounce animation-delay-1000">✨</div>
             </div>
           </div>
         )}
 
-        {/* Pet Info Cards - Bento Grid Style */}
+        {/* Pet Info Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Name Card */}
           <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-2xl transform hover:scale-105 transition-all">
             <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">🎯</div>
             <p className="text-xs sm:text-sm font-bold opacity-90 uppercase tracking-wider mb-2">Mi nombre es</p>
             <p className="text-3xl sm:text-4xl font-black">{pet.name}</p>
           </div>
 
-          {/* Breed Card */}
           {pet.breed && (
             <div className="bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-2xl transform hover:scale-105 transition-all">
               <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">🐕</div>
@@ -202,7 +194,6 @@ export default function PublicPetPage() {
             </div>
           )}
 
-          {/* Age Card */}
           {pet.age && (
             <div className="bg-gradient-to-br from-green-500 to-green-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-2xl transform hover:scale-105 transition-all">
               <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">🎂</div>
@@ -212,7 +203,7 @@ export default function PublicPetPage() {
           )}
         </div>
 
-        {/* Medical Info - Important Alert Style */}
+        {/* Medical Info */}
         {pet.medical_conditions && (
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-orange-600 rounded-3xl blur opacity-75 group-hover:opacity-100 transition-opacity animate-pulse"></div>
@@ -250,7 +241,7 @@ export default function PublicPetPage() {
           </div>
         )}
 
-        {/* Contact Section - Modern Cards */}
+        {/* Contact Section */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl border border-white">
           <h2 className="text-3xl sm:text-4xl font-black text-center mb-6 sm:mb-8">
             <span className="bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
@@ -278,21 +269,23 @@ export default function PublicPetPage() {
               </a>
             )}
 
-            <a
-              href={`mailto:${owner.email}?subject=¡Encontré a ${pet.name}!&body=Hola, encontré a ${pet.name}. Por favor contáctame.`}
-              className="group relative overflow-hidden bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
-            >
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-              <div className="relative text-white text-center">
-                <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">✉️</div>
-                <p className="font-bold text-xs sm:text-sm mb-1 sm:mb-2">Enviar Email</p>
-                <p className="text-xs sm:text-sm opacity-90">Contacto rápido</p>
-              </div>
-            </a>
+            {owner.email && (
+              <a
+                href={`mailto:${owner.email}?subject=¡Encontré a ${pet.name}!&body=Hola, encontré a ${pet.name}. Por favor contáctame.`}
+                className="group relative overflow-hidden bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
+              >
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                <div className="relative text-white text-center">
+                  <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">✉️</div>
+                  <p className="font-bold text-xs sm:text-sm mb-1 sm:mb-2">Enviar Email</p>
+                  <p className="text-xs sm:text-sm opacity-90 break-all">{owner.email}</p>
+                </div>
+              </a>
+            )}
           </div>
         </div>
 
-        {/* Report Form - Exciting Style */}
+        {/* Report Form */}
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-cyan-600 to-green-500 rounded-2xl sm:rounded-3xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
           <div className="relative bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl">
@@ -311,7 +304,7 @@ export default function PublicPetPage() {
           </div>
         </div>
 
-        {/* Footer - Brand */}
+        {/* Footer */}
         <div className="text-center pt-8 sm:pt-12">
           <div className="inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-4 bg-white/90 backdrop-blur-xl px-8 sm:px-10 py-5 sm:py-6 rounded-2xl sm:rounded-full shadow-2xl border-4 border-white">
             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center shadow-lg">
@@ -348,33 +341,13 @@ export default function PublicPetPage() {
           to { transform: rotate(360deg); }
         }
 
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-
-        .animate-spin-slow {
-          animation: spin-slow 10s linear infinite;
-        }
-
-        .animation-delay-1000 {
-          animation-delay: 1s;
-        }
-
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-
-        .animation-delay-3000 {
-          animation-delay: 3s;
-        }
-
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
+        .animate-blob { animation: blob 7s infinite; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 10s linear infinite; }
+        .animation-delay-1000 { animation-delay: 1s; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-3000 { animation-delay: 3s; }
+        .animation-delay-4000 { animation-delay: 4s; }
       `}</style>
     </div>
   )
