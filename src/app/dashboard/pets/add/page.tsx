@@ -7,6 +7,9 @@ import Link from 'next/link'
 
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE = 5 * 1024 * 1024
+const MAX_WIDTH = 1200
+const MAX_HEIGHT = 1200
+const WEBP_QUALITY = 0.85
 
 export default function AddPetPage() {
   const router = useRouter()
@@ -29,9 +32,11 @@ export default function AddPetPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
   const [imageError, setImageError] = useState('')
+  const [processingImage, setProcessingImage] = useState(false)
+  const [originalSize, setOriginalSize] = useState<number>(0)
+  const [optimizedSize, setOptimizedSize] = useState<number>(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Verificación de autenticación simplificada
   useEffect(() => {
     let mounted = true
 
@@ -49,7 +54,6 @@ export default function AddPetPage() {
 
         setUserId(session.user.id)
 
-        // Obtener perfil y mascotas en paralelo
         const [profileResponse, petsResponse] = await Promise.all([
           supabase
             .from('profiles')
@@ -101,6 +105,67 @@ export default function AddPetPage() {
     })
   }
 
+  const compressAndConvertToWebP = async (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const reader = new FileReader()
+
+      reader.onload = (e) => {
+        img.src = e.target?.result as string
+      }
+
+      img.onload = () => {
+        // Calcular nuevas dimensiones manteniendo aspect ratio
+        let width = img.width
+        let height = img.height
+
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+          const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height)
+          width = Math.round(width * ratio)
+          height = Math.round(height * ratio)
+        }
+
+        // Crear canvas para redimensionar
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('No se pudo crear el contexto del canvas'))
+          return
+        }
+
+        // Dibujar imagen redimensionada
+        ctx.drawImage(img, 0, 0, width, height)
+
+        // Convertir a WebP
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              console.log(`📊 Compresión: ${(file.size / 1024).toFixed(2)}KB → ${(blob.size / 1024).toFixed(2)}KB (${((1 - blob.size / file.size) * 100).toFixed(1)}% reducción)`)
+              resolve(blob)
+            } else {
+              reject(new Error('Error al convertir la imagen'))
+            }
+          },
+          'image/webp',
+          WEBP_QUALITY
+        )
+      }
+
+      img.onerror = () => {
+        reject(new Error('Error al cargar la imagen'))
+      }
+
+      reader.onerror = () => {
+        reject(new Error('Error al leer el archivo'))
+      }
+
+      reader.readAsDataURL(file)
+    })
+  }
+
   const validateImage = (file: File): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!ALLOWED_FILE_TYPES.includes(file.type)) {
@@ -141,22 +206,43 @@ export default function AddPetPage() {
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     setImageError('')
+    setProcessingImage(false)
 
     if (!file) return
 
     try {
-      await validateImage(file)
-      setImageFile(file)
+      setProcessingImage(true)
+      setOriginalSize(file.size)
       
+      // Validar imagen
+      await validateImage(file)
+
+      // Comprimir y convertir a WebP
+      const optimizedBlob = await compressAndConvertToWebP(file)
+      setOptimizedSize(optimizedBlob.size)
+
+      // Crear File desde Blob
+      const optimizedFile = new File(
+        [optimizedBlob],
+        file.name.replace(/\.[^/.]+$/, '.webp'),
+        { type: 'image/webp' }
+      )
+
+      setImageFile(optimizedFile)
+      
+      // Crear preview
       const reader = new FileReader()
       reader.onloadend = () => {
         setImagePreview(reader.result as string)
+        setProcessingImage(false)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(optimizedBlob)
+
     } catch (error: any) {
       setImageError(error)
       setImageFile(null)
       setImagePreview(null)
+      setProcessingImage(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -167,6 +253,8 @@ export default function AddPetPage() {
     setImageFile(null)
     setImagePreview(null)
     setImageError('')
+    setOriginalSize(0)
+    setOptimizedSize(0)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -176,8 +264,7 @@ export default function AddPetPage() {
     if (!imageFile) return null
 
     try {
-      const fileExt = imageFile.name.split('.').pop()
-      const fileName = `${userId}/${petId}-${Date.now()}.${fileExt}`
+      const fileName = `${userId}/${petId}-${Date.now()}.webp`
 
       setUploadProgress(30)
 
@@ -185,7 +272,8 @@ export default function AddPetPage() {
         .from('pet-photos')
         .upload(fileName, imageFile, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/webp'
         })
 
       if (error) throw error
@@ -220,7 +308,6 @@ export default function AddPetPage() {
     try {
       setUploadProgress(10)
       
-      // Crear mascota
       const { data: petData, error: petError } = await supabase
         .from('pets')
         .insert([{
@@ -230,7 +317,7 @@ export default function AddPetPage() {
           medical_conditions: formData.medical_conditions || null,
           reward: formData.reward || null,
           user_id: userId,
-          short_id: '', // Se genera automáticamente en el backend
+          short_id: '',
           is_active: true,
           photo_url: null
         }])
@@ -239,7 +326,6 @@ export default function AddPetPage() {
 
       if (petError) throw petError
 
-      // Subir imagen si existe
       let photoUrl = null
       if (imageFile && petData) {
         photoUrl = await uploadImage(petData.id)
@@ -255,7 +341,6 @@ export default function AddPetPage() {
         }
       }
 
-      // Redirigir al dashboard
       router.push('/dashboard')
       router.refresh()
     } catch (error: any) {
@@ -265,6 +350,10 @@ export default function AddPetPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const formatBytes = (bytes: number) => {
+    return (bytes / 1024).toFixed(2)
   }
 
   if (loading) {
@@ -332,7 +421,6 @@ export default function AddPetPage() {
               </Link>
             </div>
             
-            {/* Contador de espacios */}
             <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-4 border border-blue-200">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">Espacios disponibles</span>
@@ -351,10 +439,22 @@ export default function AddPetPage() {
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-gray-900">Foto de la mascota</h3>
-                <p className="text-sm text-gray-500">Ayuda a identificar a tu compañero rápidamente</p>
+                <p className="text-sm text-gray-500">Optimizada automáticamente a WebP</p>
               </div>
               <span className="text-sm text-gray-500 bg-gray-100 px-4 py-2 rounded-full font-medium">Opcional</span>
             </div>
+
+            {processingImage && (
+              <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-2xl p-6">
+                <div className="flex items-center gap-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-blue-900 mb-1">Optimizando imagen...</p>
+                    <p className="text-xs text-blue-700">Convirtiendo a WebP y comprimiendo</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {!imagePreview ? (
               <div
@@ -369,6 +469,9 @@ export default function AddPetPage() {
                 </p>
                 <p className="text-sm text-gray-500 mb-4">
                   JPG, PNG o WEBP • Máximo 5MB
+                </p>
+                <p className="text-xs text-blue-600 font-medium bg-blue-50 inline-block px-4 py-2 rounded-lg">
+                  Se optimizará automáticamente
                 </p>
               </div>
             ) : (
@@ -389,6 +492,29 @@ export default function AddPetPage() {
                     </svg>
                   </button>
                 </div>
+
+                {/* Compression Stats */}
+                {originalSize > 0 && optimizedSize > 0 && (
+                  <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">✅</span>
+                        <div>
+                          <p className="text-sm font-bold text-green-900">Imagen optimizada</p>
+                          <p className="text-xs text-green-700">
+                            {formatBytes(originalSize)}KB → {formatBytes(optimizedSize)}KB 
+                            <span className="font-bold ml-1">
+                              ({((1 - optimizedSize / originalSize) * 100).toFixed(0)}% menos)
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold">
+                        WebP
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -559,10 +685,10 @@ export default function AddPetPage() {
             
             <button
               type="submit"
-              disabled={saving || !formData.name.trim()}
+              disabled={saving || !formData.name.trim() || processingImage}
               className="px-12 py-4 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-green-600 rounded-xl hover:from-blue-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
             >
-              {saving ? 'Guardando...' : 'Agregar Mascota'}
+              {saving ? 'Guardando...' : processingImage ? 'Procesando...' : 'Agregar Mascota'}
             </button>
           </div>
         </form>
