@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LinkPet",
-  description: "LinkPet dev by César Enriquez",
+  title: "PetGuard",
+  description: "PetGuard dev by César Enriquez",
 };
 
 export default function RootLayout({
