@@ -3,22 +3,6 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  // ⏸️ VERIFICAR SI LA APP ESTÁ PAUSADA (PRIMERO)
-  const isPaused = process.env.APP_PAUSED === 'true'
-  
-  if (isPaused) {
-    return new NextResponse(
-      'Sitio en mantenimiento. Volveremos pronto.',
-      {
-        status: 503,
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-        }
-      }
-    )
-  }
-
-  // 🔐 TU LÓGICA ORIGINAL DE SUPABASE
   let res = NextResponse.next()
   
   // Crear el cliente de Supabase para middleware
